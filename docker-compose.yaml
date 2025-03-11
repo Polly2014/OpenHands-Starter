@@ -1,0 +1,20 @@
+services:
+  openhands-app:
+    image: docker.all-hands.dev/all-hands-ai/openhands:0.25
+    container_name: openhands-app
+    environment:
+      - SANDBOX_RUNTIME_CONTAINER_IMAGE:docker.all-hands.dev/all-hands-ai/runtime:0.25-nikolaik
+      - LOG_ALL_EVENTS:"true"
+      - SANDBOX_USER_ID:-1234
+      - WORKSPACE_MOUNT_PATH:~/Docker_Workspace
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.openhands-state:/.openhands-state
+      - ~/Docker_Workspace:/opt/workspace_base
+    ports:
+      - "80:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    tty: true
+    stdin_open: true
+    restart: "no"
