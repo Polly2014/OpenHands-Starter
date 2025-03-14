@@ -28,7 +28,7 @@ from PyQt5.QtCore import (Qt, QThread, pyqtSignal, QTimer, QUrl, QSize,
 # 应用程序常量
 APP_NAME = "OpenHands PC部署助手"
 APP_VERSION = "1.0.0"
-APP_AUTHOR = "OpenHands Team"
+APP_AUTHOR = "Polly"
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".openhands-assistant")
 LOG_FILE = os.path.join(CONFIG_DIR, "openhands-assistant.log")
 
@@ -36,12 +36,12 @@ LOG_FILE = os.path.join(CONFIG_DIR, "openhands-assistant.log")
 DOCKER_COMPOSE_TEMPLATE = '''
 services:
   openhands-app:
-    image: docker.all-hands.dev/all-hands-ai/openhands:0.25
+    image: docker.all-hands.dev/all-hands-ai/openhands:0.27
     container_name: openhands-app
     environment:
-      - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.25-nikolaik
+      - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.27-nikolaik
       - LOG_ALL_EVENTS=true
-      - SANDBOX_USER_ID=-1234
+      - SANDBOX_USER_ID="1000"
       - WORKSPACE_MOUNT_PATH={workspace_path}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -229,7 +229,7 @@ class SystemChecker:
                 stderr=subprocess.PIPE,
                 text=True
             )
-            if "虚拟化已启用" in result.stdout or "Virtualization Enabled" in result.stdout:
+            if "虚拟化已启用" in result.stdout or "Virtualization Support" in result.stdout:
                 self.logger.info("虚拟化已启用")
                 return True
             else:
@@ -499,10 +499,20 @@ class SetupWizard(QWizard):
         # 添加logo
         logo_label = QLabel()
         # 如果有Logo图像，可以取消注释下面的代码并提供正确的路径
-        # logo_pixmap = QPixmap("path/to/logo.png").scaled(200, 200, Qt.KeepAspectRatio)
-        # logo_label.setPixmap(logo_pixmap)
-        # logo_label.setAlignment(Qt.AlignCenter)
-        # layout.addWidget(logo_label)
+        '''
+        # 使用同目录下的polly.ico作为logo
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "polly.ico")
+        if os.path.exists(logo_path):
+            # 从.ico文件加载图标并转换为QPixmap
+            icon = QIcon(logo_path)
+            logo_pixmap = icon.pixmap(200, 200)
+            logo_label.setPixmap(logo_pixmap)
+            logo_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(logo_label)
+        else:
+            # 如果找不到文件，记录警告信息
+            print(f"警告：找不到logo文件: {logo_path}")
+        '''
         
         # 介绍文字
         intro_text = """
@@ -831,15 +841,40 @@ class SetupWizard(QWizard):
         
         # 页面验证处理
         page.validatePage = self.validateConfigPage
+
+        self.workspace_dir_edit.textChanged.connect(self.updateNextButtonState)
+        self.state_dir_edit.textChanged.connect(self.updateNextButtonState)
+        self.port_edit.textChanged.connect(self.updateNextButtonState)
         
         return page
-    
+
+    def updateNextButtonState(self):
+        """Update Next button state based on field validation"""
+        # Check if fields are valid and enable/disable Next button accordingly
+        workspace_dir = self.workspace_dir_edit.text()
+        state_dir = self.state_dir_edit.text()
+        port = self.port_edit.text()
+        
+        # Basic validation
+        is_valid = bool(workspace_dir.strip() and state_dir.strip() and port.strip())
+        
+        # Additional port validation
+        if is_valid and port.strip():
+            try:
+                port_num = int(port)
+                is_valid = 1 <= port_num <= 65535
+            except ValueError:
+                is_valid = False
+        
+        # Update button state
+        self.button(QWizard.NextButton).setEnabled(is_valid)
+
     def browse_directory(self, line_edit):
         """浏览并选择目录"""
         directory = QFileDialog.getExistingDirectory(self, "选择目录", line_edit.text())
         if directory:
             line_edit.setText(directory)
-    
+
     def validateConfigPage(self):
         """验证配置页面内容并保存设置"""
         # 获取配置值
@@ -995,6 +1030,12 @@ class MainWindow(QMainWindow):
         # 设置窗口基本属性
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.setMinimumSize(800, 600)
+
+        # 设置窗口图标
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "polly.ico")
+        if os.path.exists(logo_path):
+            app_icon = QIcon(logo_path)
+            self.setWindowIcon(app_icon)
         
         # 创建中央窗口部件
         central_widget = QWidget()
@@ -1176,7 +1217,6 @@ class MainWindow(QMainWindow):
             <li>管理OpenHands容器</li>
             <li>提供简单易用的Web界面接入</li>
         </ul>
-        <p>版权所有 © 2025 OpenHands Team</p>
         """
         
         about_label = QLabel(about_text)
@@ -1200,8 +1240,16 @@ class MainWindow(QMainWindow):
         """初始化系统托盘图标"""
         self.tray_icon = QSystemTrayIcon(self)
         
-        # 使用系统图标
-        self.tray_icon.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
+        # # 使用系统图标
+        # self.tray_icon.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
+        # 使用polly.ico作为托盘图标
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "polly.ico")
+        if os.path.exists(logo_path):
+            app_icon = QIcon(logo_path)
+            self.tray_icon.setIcon(app_icon)
+        else:
+            # 如果找不到logo文件，使用系统默认图标
+            self.tray_icon.setIcon(self.style().standardIcon(QStyle.SP_ComputerIcon))
         
         # 创建托盘菜单
         tray_menu = QMenu()
@@ -1429,12 +1477,14 @@ class MainWindow(QMainWindow):
             return
             
         try:
-            # 获取容器日志
+            # 获取容器日志 - FIX: Add utf-8 encoding
             process = subprocess.Popen(
                 ["docker", "logs", "openhands-app", "--tail", "50"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                encoding='utf-8',  # Add explicit UTF-8 encoding
+                errors='replace'   # Replace characters that can't be decoded
             )
             
             stdout, stderr = process.communicate()
