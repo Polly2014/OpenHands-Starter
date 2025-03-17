@@ -299,7 +299,7 @@ function Update-DockerComposeFile {
     Write-Status "Setting up docker-compose.yaml..."
     
     try {
-        # Create docker compose template with explicit port format
+        # Create docker compose template with correct volume format
         $dockerComposeTemplate = @"
 version: '3'
 services:
@@ -314,7 +314,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - $($stateDirPath.Replace('\','/')):/.openhands-state
-      - $($workspaceDir.Replace('\','/')):(/opt/workspace_base)
+      - $($workspaceDir.Replace('\','/')):/opt/workspace_base
     ports:
       - "$($webPort):3000"
     extra_hosts:
@@ -487,9 +487,102 @@ function Pull-DockerImages {
     }
 }
 
-# Function to deploy OpenHands
+# Function to deploy OpenHands with Docker
+# 直接使用 Docker 命令部署
+# function Deploy-OpenHands {
+#     if (-not (Test-Prerequisites -RequiredSteps @("WSLInstalled", "DockerInstalled", "DockerRunning", "WorkspaceSetup"))) {
+#         return $false
+#     }
+    
+#     Write-Status "Deploying OpenHands..."
+    
+#     try {
+#         # 检查是否有正在运行的容器并停止
+#         Write-Status "Checking for existing OpenHands containers..." -Type "Info"
+#         $existingContainer = docker ps -a --filter "name=openhands-app" --format "{{.Names}}"
+        
+#         if ($existingContainer) {
+#             Write-Status "Found existing OpenHands container. Stopping and removing..." -Type "Info"
+#             docker stop openhands-app 2>$null
+#             docker rm openhands-app 2>$null
+#         }
+        
+#         # 使用直接的 Docker 命令部署
+#         Write-Status "Deploying OpenHands container using Docker..." -Type "Info"
+        
+#         # 准备正确的路径格式 - 完全修复格式问题
+#         $stateDir = $stateDirPath.Replace('\', '/')
+#         $workspace = $workspaceDir.Replace('\', '/')
+        
+#         # 使用批处理命令构建完整的Docker命令，避免转义问题
+#         $script = @"
+# @echo off
+# docker run -d --name openhands-app ^
+#   -p $webPort`:3000 ^
+#   -e SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.27-nikolaik ^
+#   -e LOG_ALL_EVENTS=true ^
+#   -e SANDBOX_USER_ID=1000 ^
+#   -e WORKSPACE_MOUNT_PATH=$workspace ^
+#   -v /var/run/docker.sock:/var/run/docker.sock ^
+#   -v "$stateDir":/.openhands-state ^
+#   -v "$workspace":/opt/workspace_base ^
+#   --add-host=host.docker.internal:host-gateway ^
+#   -t docker.all-hands.dev/all-hands-ai/openhands:latest
+# "@
+        
+#         # 将命令写入临时批处理文件
+#         $batchFile = "$env:TEMP\openhands_deploy.bat"
+#         $script | Out-File -FilePath $batchFile -Encoding ASCII
+        
+#         # 执行批处理文件
+#         Write-Status "Executing deployment command via batch file..." -Type "Info"
+#         cmd /c $batchFile
+        
+#         # 验证容器是否正在运行
+#         Start-Sleep -Seconds 5
+#         $containerRunning = docker ps --filter "name=openhands-app" --format "{{.Status}}" | Select-String "Up"
+        
+#         # 清理临时文件
+#         if (Test-Path $batchFile) {
+#             Remove-Item $batchFile -Force
+#         }
+        
+#         if ($containerRunning) {
+#             Write-Status "OpenHands deployed successfully!" -Type "Success"
+#             return $true
+#         } else {
+#             # 检查容器日志以查看错误
+#             Write-Status "Container not running properly. Checking logs..." -Type "Warning"
+#             $containerLogs = docker ps -a --filter "name=openhands-app" --format "{{.Status}}"
+#             Write-Status "Container status: $containerLogs" -Type "Info"
+            
+#             $containerLogs = docker logs openhands-app 2>&1
+#             if ($containerLogs) {
+#                 Write-Status "Container logs show:" -Type "Info"
+#                 $containerLogs | ForEach-Object { Write-Status $_ -Type "Info" }
+#             } else {
+#                 Write-Status "No container logs available" -Type "Warning"
+#             }
+            
+#             Write-Status "Deployment failed. Please check Docker for errors." -Type "Error"
+#             return $false
+#         }
+#     }
+#     catch {
+#         Write-Status "Failed to deploy OpenHands: $_" -Type "Error"
+        
+#         # 输出完整错误详情
+#         Write-Status "Error details:" -Type "Error"
+#         Write-Status "$($_.Exception)" -Type "Error"
+#         Write-Status "$($_.ScriptStackTrace)" -Type "Error"
+        
+#         return $false
+#     }
+# }
+# 由于 Docker Desktop 在 Windows 上的行为，使用 docker-compose 是更好的选择
+# 使用 docker-compose 部署
 function Deploy-OpenHands {
-    if (-not (Test-Prerequisites -RequiredSteps @("WSLInstalled", "DockerInstalled", "DockerRunning", "WorkspaceSetup"))) {
+    if (-not (Test-Prerequisites -RequiredSteps @("WSLInstalled", "DockerInstalled", "DockerRunning", "WorkspaceSetup", "ComposeCreated"))) {
         return $false
     }
     
@@ -506,45 +599,23 @@ function Deploy-OpenHands {
             docker rm openhands-app 2>$null
         }
         
-        # 使用直接的 Docker 命令部署
-        Write-Status "Deploying OpenHands container using Docker..." -Type "Info"
+        # 使用 docker-compose 文件部署
+        Write-Status "Deploying OpenHands using docker-compose..." -Type "Info"
         
-        # 准备正确的路径格式 - 完全修复格式问题
-        $stateDir = $stateDirPath.Replace('\', '/')
-        $workspace = $workspaceDir.Replace('\', '/')
+        # 切换到包含 docker-compose.yaml 的目录
+        $currentDir = Get-Location
+        $composeDir = Split-Path -Parent $dockerComposeFile
+        Set-Location $composeDir
         
-        # 使用批处理命令构建完整的Docker命令，避免转义问题
-        $script = @"
-@echo off
-docker run -d --name openhands-app ^
-  -p $webPort`:3000 ^
-  -e SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.27-nikolaik ^
-  -e LOG_ALL_EVENTS=true ^
-  -e SANDBOX_USER_ID=1000 ^
-  -e WORKSPACE_MOUNT_PATH=$workspace ^
-  -v /var/run/docker.sock:/var/run/docker.sock ^
-  -v "$stateDir":/.openhands-state ^
-  -v "$workspace":/opt/workspace_base ^
-  --add-host=host.docker.internal:host-gateway ^
-  -t docker.all-hands.dev/all-hands-ai/openhands:latest
-"@
+        # 执行 docker-compose up 命令
+        docker-compose -f $dockerComposeFile up -d
         
-        # 将命令写入临时批处理文件
-        $batchFile = "$env:TEMP\openhands_deploy.bat"
-        $script | Out-File -FilePath $batchFile -Encoding ASCII
-        
-        # 执行批处理文件
-        Write-Status "Executing deployment command via batch file..." -Type "Info"
-        cmd /c $batchFile
+        # 恢复原始目录
+        Set-Location $currentDir
         
         # 验证容器是否正在运行
         Start-Sleep -Seconds 5
         $containerRunning = docker ps --filter "name=openhands-app" --format "{{.Status}}" | Select-String "Up"
-        
-        # 清理临时文件
-        if (Test-Path $batchFile) {
-            Remove-Item $batchFile -Force
-        }
         
         if ($containerRunning) {
             Write-Status "OpenHands deployed successfully!" -Type "Success"
@@ -748,6 +819,6 @@ Write-Host "  OpenHands deployment completed!      " -ForegroundColor Green
 Write-Host "=======================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "If you encounter any issues, please check the Docker Desktop logs"
-Write-Host "or run 'docker logs openhands-app' to view container logs."
+Write-Host "or run 'docker-compose logs' to view container logs."
 Write-Host ""
 Write-Host "Access OpenHands at http://localhost:$webPort"
