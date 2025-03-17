@@ -301,7 +301,6 @@ function Update-DockerComposeFile {
     try {
         # Create docker compose template with correct volume format
         $dockerComposeTemplate = @"
-version: '3'
 services:
   openhands-app:
     image: docker.all-hands.dev/all-hands-ai/openhands:latest
