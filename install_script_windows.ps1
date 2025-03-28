@@ -315,7 +315,7 @@ services:
     image: docker.all-hands.dev/all-hands-ai/openhands:latest
     container_name: openhands-app
     environment:
-      - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik
+      - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.30-nikolaik
       - LOG_ALL_EVENTS=true
       - SANDBOX_USER_ID=1000
       - WORKSPACE_MOUNT_PATH=$($workspaceDir.Replace('\','/'))
@@ -413,7 +413,7 @@ function Setup-Workspace {
         
 #         # Try to pull runtime image
 #         Write-Status "Pulling OpenHands runtime image..." -Type "Info"
-#         $pullRuntime = docker pull docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik
+#         $pullRuntime = docker pull docker.all-hands.dev/all-hands-ai/runtime:0.30-nikolaik
         
 #         Write-Status "Docker images pulled successfully" -Type "Success"
 #         return $true
@@ -454,7 +454,7 @@ function Pull-DockerImages {
         Write-Status "Pulling OpenHands runtime image... (Progress will be shown below)" -Type "Info"
         Write-Host ""
         
-        $runtimePullProcess = Start-Process -FilePath "docker" -ArgumentList "pull", "docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik" -NoNewWindow -PassThru -Wait
+        $runtimePullProcess = Start-Process -FilePath "docker" -ArgumentList "pull", "docker.all-hands.dev/all-hands-ai/runtime:0.30-nikolaik" -NoNewWindow -PassThru -Wait
         
         Write-Host ""
         if ($runtimePullProcess.ExitCode -ne 0) {
@@ -463,7 +463,7 @@ function Pull-DockerImages {
         
         # 验证镜像是否已拉取
         $appImage = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq "docker.all-hands.dev/all-hands-ai/openhands:latest" }
-        $runtimeImage = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq "docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik" }
+        $runtimeImage = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq "docker.all-hands.dev/all-hands-ai/runtime:0.30-nikolaik" }
         
         if ($appImage -and $runtimeImage) {
             Write-Status "Docker images pulled successfully" -Type "Success"
@@ -527,7 +527,7 @@ function Deploy-OpenHands {
 @echo off
 docker run -d --name openhands-app ^
   -p $webPort`:3000 ^
-  -e SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik ^
+  -e SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.30-nikolaik ^
   -e LOG_ALL_EVENTS=true ^
   -e SANDBOX_USER_ID=1000 ^
   -e WORKSPACE_MOUNT_PATH=$workspace ^
