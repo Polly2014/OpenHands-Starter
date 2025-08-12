@@ -1,5 +1,5 @@
 # OpenHands-Starter
-(OpenHands-Starter)[OpenHands-Starter.gif]
+![OpenHands-Starter](OpenHands-Starter.gif)
 
 
 ## Script of PS2EXE
@@ -17,3 +17,4 @@ Invoke-ps2exe -InputFile "D:\git_workspace\OpenHands-Starter\install_script_wind
               -noConsole
 
 ```
+
